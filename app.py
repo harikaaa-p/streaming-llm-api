@@ -1,15 +1,23 @@
+from flask import Flask, request, Response, stream_with_context, jsonify
 from flask_cors import CORS
-from flask import Flask, request, Response, stream_with_context
 from groq import Groq
 import json
 import os
 from dotenv import load_dotenv
 
+# Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
 
+# Enable full CORS support
+CORS(
+    app,
+    resources={r"/*": {"origins": "*"}},
+    supports_credentials=True,
+)
+
+# Initialize Groq client
 client = Groq(
     api_key=os.getenv("GROQ_API_KEY")
 )
@@ -25,7 +33,7 @@ def generate_stream(prompt):
         )
 
         for chunk in response:
-            if chunk.choices[0].delta.content:
+            if chunk.choices and chunk.choices[0].delta.content:
                 content = chunk.choices[0].delta.content
 
                 data = {
@@ -47,21 +55,32 @@ def generate_stream(prompt):
         yield f"data: {json.dumps(error_data)}\n\n"
 
 
-@app.route("/stream", methods=["POST"])
+@app.route("/stream", methods=["POST", "OPTIONS"])
 def stream():
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
+
     data = request.json
 
     if not data or "prompt" not in data:
-        return {"error": "Prompt is required"}, 400
+        return jsonify({"error": "Prompt is required"}), 400
 
     prompt = data["prompt"]
 
     return Response(
         stream_with_context(generate_stream(prompt)),
-        content_type="text/event-stream"
+        content_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+        },
     )
 
 
+# Proper Render port binding
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-
+    app.run(
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 5000)),
+    )
