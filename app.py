@@ -1,3 +1,4 @@
+from flask_cors import CORS
 from flask import Flask, request, Response, stream_with_context
 from groq import Groq
 import json
@@ -7,6 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app)
 
 client = Groq(
     api_key=os.getenv("GROQ_API_KEY")
