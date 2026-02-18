@@ -92,9 +92,12 @@ def stream():
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
+            "Transfer-Encoding": "chunked",
             "Access-Control-Allow-Origin": "*",
-        },
+            },
+            direct_passthrough=True,
     )
+
 
 
 # Proper Render binding
