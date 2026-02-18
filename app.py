@@ -17,7 +17,7 @@ client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 def generate_stream(prompt):
     try:
-        # 🔥 Immediately send a tiny first chunk to reduce first-token latency
+        # Immediate first chunk (for latency test)
         yield 'data: {"choices":[{"delta":{"content":""}}]}\n\n'
 
         response = client.chat.completions.create(
@@ -26,27 +26,47 @@ def generate_stream(prompt):
             stream=True,
         )
 
+        buffer = ""
+        chunk_counter = 0
+
         for chunk in response:
             if chunk.choices and chunk.choices[0].delta.content:
-                content = chunk.choices[0].delta.content
+                buffer += chunk.choices[0].delta.content
 
-                data = {
-                    "choices": [
-                        {
-                            "delta": {
-                                "content": content
+                # Every ~80 characters, flush a chunk
+                if len(buffer) >= 80:
+                    data = {
+                        "choices": [
+                            {
+                                "delta": {
+                                    "content": buffer
+                                }
                             }
-                        }
-                    ]
-                }
+                        ]
+                    }
+                    yield f"data: {json.dumps(data)}\n\n"
+                    buffer = ""
+                    chunk_counter += 1
 
-                yield f"data: {json.dumps(data)}\n\n"
+        # Flush remaining buffer
+        if buffer:
+            data = {
+                "choices": [
+                    {
+                        "delta": {
+                            "content": buffer
+                        }
+                    }
+                ]
+            }
+            yield f"data: {json.dumps(data)}\n\n"
 
         yield "data: [DONE]\n\n"
 
     except Exception as e:
         error_data = {"error": str(e)}
         yield f"data: {json.dumps(error_data)}\n\n"
+
 
 
 @app.route("/stream", methods=["GET", "POST", "OPTIONS"])
